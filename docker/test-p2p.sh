@@ -10,9 +10,6 @@
 set -e
 cd "$(dirname "$0")/.."
 
-echo "=== Building JAR ==="
-./mvnw package -DskipTests -q -pl holypunch-client,holypunch-server
-
 echo "=== Generating test data (60 MB total) ==="
 mkdir -p testdata output
 dd if=/dev/urandom of=testdata/small.bin  bs=1M count=5  2>/dev/null
@@ -45,9 +42,11 @@ fi
 echo "=== Code: $CODE ==="
 
 echo "=== Starting receiver ==="
-docker compose -f docker/compose.yml run --rm \
+# MSYS_NO_PATHCONV=1 prevents Git Bash from converting the container path /output
+# to a Windows path (C:/Program Files/Git/output) when passed as a CLI argument.
+MSYS_NO_PATHCONV=1 docker compose -f docker/compose.yml run --rm \
   -e HOLYPUNCH_SERVER=ws://hp-server:8080/signal \
-  -v "$(pwd)/output:/output" \
+  -v "$(pwd -W)/output:/output" \
   hp-sender receive "$CODE" /output
 
 echo "=== Verifying ==="
@@ -57,10 +56,9 @@ echo "Files sent: $SENT  |  Files received: $RECV"
 [ "$SENT" -eq "$RECV" ] && echo "PASS: file count matches" || { echo "FAIL: count mismatch"; exit 1; }
 
 echo "=== Comparing checksums ==="
-cd testdata && find . -type f -exec sha256sum {} \; | sort > /tmp/sent.sha
-cd ../output  && find . -type f -exec sha256sum {} \; | sort > /tmp/recv.sha
+(cd testdata && find . -type f -exec sha256sum {} \; | sort) > /tmp/sent.sha
+(cd output   && find . -type f -exec sha256sum {} \; | sort) > /tmp/recv.sha
 diff /tmp/sent.sha /tmp/recv.sha && echo "PASS: all checksums match" || { echo "FAIL: checksum mismatch"; exit 1; }
-cd ..
 
 echo "=== Cleanup ==="
 docker compose -f docker/compose.yml down

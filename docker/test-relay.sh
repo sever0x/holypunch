@@ -12,9 +12,6 @@
 set -e
 cd "$(dirname "$0")/.."
 
-echo "=== Building JAR ==="
-./mvnw package -DskipTests -q -pl holypunch-client,holypunch-server
-
 echo "=== Generating test data ==="
 mkdir -p testdata output
 dd if=/dev/urandom of=testdata/relay-test.bin bs=1M count=20 2>/dev/null
@@ -46,10 +43,10 @@ done
 echo "=== Code: $CODE ==="
 
 echo "=== Starting receiver (also UDP-blocked → relay on both sides) ==="
-docker compose -f docker/compose.yml -f docker/compose.relay.yml run --rm \
+MSYS_NO_PATHCONV=1 docker compose -f docker/compose.yml -f docker/compose.relay.yml run --rm \
   --cap-add NET_ADMIN \
   -e HOLYPUNCH_SERVER=ws://hp-server:8080/signal \
-  -v "$(pwd)/output:/output" \
+  -v "$(pwd -W)/output:/output" \
   hp-sender sh -c "
     apk add -q iptables 2>/dev/null
     iptables -A OUTPUT -p udp -j DROP
@@ -60,8 +57,9 @@ echo "=== Verifying ==="
 SENT=$(find testdata -type f | wc -l)
 RECV=$(find output   -type f | wc -l)
 [ "$SENT" -eq "$RECV" ] && echo "PASS: file count matches" || { echo "FAIL"; exit 1; }
-diff <(cd testdata && find . -type f -exec sha256sum {} \; | sort) \
-     <(cd output   && find . -type f -exec sha256sum {} \; | sort) \
+(cd testdata && find . -type f -exec sha256sum {} \; | sort) > /tmp/sent.sha
+(cd output   && find . -type f -exec sha256sum {} \; | sort) > /tmp/recv.sha
+diff /tmp/sent.sha /tmp/recv.sha \
   && echo "PASS: checksums match" || { echo "FAIL: checksum mismatch"; exit 1; }
 
 docker compose -f docker/compose.yml -f docker/compose.relay.yml down

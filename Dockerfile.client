@@ -1,4 +1,9 @@
+FROM eclipse-temurin:21-jdk AS build
+WORKDIR /workspace
+COPY . .
+RUN chmod +x mvnw && ./mvnw package -DskipTests -q -pl holypunch-client --also-make
+
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
-COPY holypunch-client/target/holypunch-client-*.jar app.jar
+COPY --from=build /workspace/holypunch-client/target/holypunch-client-*.jar app.jar
 ENTRYPOINT ["java", "-jar", "app.jar"]

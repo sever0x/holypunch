@@ -12,9 +12,6 @@ set -e
 cd "$(dirname "$0")/.."
 LOSS=${1:-20}
 
-echo "=== Building JAR ==="
-./mvnw package -DskipTests -q -pl holypunch-client,holypunch-server
-
 echo "=== Generating test data ==="
 mkdir -p testdata output
 dd if=/dev/urandom of=testdata/arq-test.bin bs=1M count=30 2>/dev/null
@@ -44,10 +41,10 @@ done
 echo "=== Code: $CODE ==="
 
 echo "=== Starting receiver ==="
-docker compose -f docker/compose.yml -f docker/compose.relay.yml run --rm \
+MSYS_NO_PATHCONV=1 docker compose -f docker/compose.yml -f docker/compose.relay.yml run --rm \
   --cap-add NET_ADMIN \
   -e HOLYPUNCH_SERVER=ws://hp-server:8080/signal \
-  -v "$(pwd)/output:/output" \
+  -v "$(pwd -W)/output:/output" \
   hp-sender sh -c "
     apk add -q iproute2 2>/dev/null
     tc qdisc add dev eth0 root netem loss ${LOSS}%
@@ -55,8 +52,9 @@ docker compose -f docker/compose.yml -f docker/compose.relay.yml run --rm \
   "
 
 echo "=== Verifying ==="
-diff <(cd testdata && find . -type f -exec sha256sum {} \; | sort) \
-     <(cd output   && find . -type f -exec sha256sum {} \; | sort) \
+(cd testdata && find . -type f -exec sha256sum {} \; | sort) > /tmp/sent.sha
+(cd output   && find . -type f -exec sha256sum {} \; | sort) > /tmp/recv.sha
+diff /tmp/sent.sha /tmp/recv.sha \
   && echo "PASS: all checksums match under ${LOSS}% packet loss" \
   || { echo "FAIL"; exit 1; }
 
