@@ -1,0 +1,6 @@
+# Overlay for relay testing: grants NET_ADMIN so iptables can block UDP inside containers.
+# Usage: docker compose -f docker/compose.yml -f docker/compose.relay.yml <command>
+services:
+  hp-sender:
+    cap_add:
+      - NET_ADMIN

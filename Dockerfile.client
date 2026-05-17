@@ -1,0 +1,4 @@
+FROM eclipse-temurin:21-jre-alpine
+WORKDIR /app
+COPY holypunch-client/target/holypunch-client-*.jar app.jar
+ENTRYPOINT ["java", "-jar", "app.jar"]

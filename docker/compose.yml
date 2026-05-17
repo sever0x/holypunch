@@ -1,0 +1,31 @@
+services:
+  hp-server:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    networks:
+      - holypunch-net
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/actuator/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  hp-sender:
+    build:
+      context: ..
+      dockerfile: Dockerfile.client
+    environment:
+      - HOLYPUNCH_SERVER=ws://hp-server:8080/signal
+    volumes:
+      - ../testdata:/data:ro
+    command: send /data
+    networks:
+      - holypunch-net
+    depends_on:
+      hp-server:
+        condition: service_healthy
+
+networks:
+  holypunch-net:
+    driver: bridge
