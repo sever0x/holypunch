@@ -1,14 +1,20 @@
 package io.github.sever0x.holypunch.client;
 
+import io.github.sever0x.holypunch.client.cli.ReceiveCommand;
+import io.github.sever0x.holypunch.client.cli.SendCommand;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 
 @Command(
         name = "holypunch",
-        subcommands = {CommandLine.HelpCommand.class},
+        subcommands = {
+                SendCommand.class,
+                ReceiveCommand.class,
+                CommandLine.HelpCommand.class
+        },
         mixinStandardHelpOptions = true,
         version = "0.1.0",
-        description = "P2P file transfer with NAT hole punching"
+        description = "P2P file transfer with NAT hole punching and relay fallback."
 )
 public class HolypunchMain implements Runnable {
 

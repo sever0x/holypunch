@@ -23,6 +23,8 @@ public final class TransferProtocol {
     public static final String TRANSFER_COMPLETE = "TRANSFER_COMPLETE";
 
     // Signaling message types (shared with server signaling protocol)
+    public static final String JOIN_SENDER       = "JOIN_SENDER";
+    public static final String JOIN_RECEIVER     = "JOIN_RECEIVER";
     public static final String ICE_CANDIDATES    = "ICE_CANDIDATES";
     public static final String RELAY_REQUEST     = "RELAY_REQUEST";
     public static final String RELAY_READY       = "RELAY_READY";
