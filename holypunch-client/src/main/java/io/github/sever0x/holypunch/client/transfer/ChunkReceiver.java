@@ -76,7 +76,9 @@ public class ChunkReceiver {
         }
 
         // 3. Pre-allocate destination files; immediately ACK zero-chunk (empty) files
+        // channels is declared before the try so the finally block can close them on interrupt
         Map<Integer, FileChannel> channels = new HashMap<>();
+        try {
         for (int fi = 0; fi < manifest.files.size(); fi++) {
             FileManifest.FileEntry entry = manifest.files.get(fi);
             Path filePath = resolveDestPath(entry.path);
@@ -154,6 +156,7 @@ public class ChunkReceiver {
 
         // Close any channels still open (shouldn't happen under normal flow)
         for (FileChannel ch : channels.values()) ch.close();
+        channels.clear();
 
         // 6. Final result
         boolean allComplete = channels.isEmpty();
@@ -162,6 +165,14 @@ public class ChunkReceiver {
 
         if (allComplete) {
             stateManager.delete();
+        }
+        } finally {
+            // Ensure file channels are closed even on interrupt/exception.
+            // Data written before force() may not be on disk, but the state file
+            // only records chunks after force(), so resume will re-request those.
+            for (FileChannel ch : channels.values()) {
+                try { ch.close(); } catch (IOException ignored) {}
+            }
         }
     }
 

@@ -49,13 +49,21 @@ public class ReceiveCommand implements Runnable {
 
     @Override
     public void run() {
+        // Register shutdown hook so Ctrl+C or terminal-close prints resume instructions
+        Thread hook = new Thread(() ->
+                System.err.printf("%nTransfer interrupted. Progress is saved.%n" +
+                        "To resume: ask the sender to run 'holypunch send' again,%n" +
+                        "then enter the new code pointing to the same destination folder.%n"));
+        Runtime.getRuntime().addShutdownHook(hook);
+
         try {
             runReceive();
+            Runtime.getRuntime().removeShutdownHook(hook); // don't print on success
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            System.err.println("\nInterrupted.");
-            System.exit(1);
+            System.exit(1); // hook prints the message
         } catch (Exception e) {
+            Runtime.getRuntime().removeShutdownHook(hook);
             System.err.println("\nError: " + e.getMessage());
             System.exit(1);
         }

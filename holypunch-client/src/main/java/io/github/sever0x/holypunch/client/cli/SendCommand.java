@@ -48,13 +48,20 @@ public class SendCommand implements Runnable {
 
     @Override
     public void run() {
+        Thread hook = new Thread(() ->
+                System.err.printf("%nTransfer interrupted.%n" +
+                        "Run 'holypunch send' again to get a new code — the receiver will resume%n" +
+                        "automatically if the source directory has not changed.%n"));
+        Runtime.getRuntime().addShutdownHook(hook);
+
         try {
             runSend();
+            Runtime.getRuntime().removeShutdownHook(hook);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            System.err.println("\nInterrupted.");
             System.exit(1);
         } catch (Exception e) {
+            Runtime.getRuntime().removeShutdownHook(hook);
             System.err.println("\nError: " + e.getMessage());
             System.exit(1);
         }
