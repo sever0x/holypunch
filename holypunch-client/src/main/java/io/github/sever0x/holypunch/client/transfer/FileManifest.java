@@ -1,5 +1,6 @@
 package io.github.sever0x.holypunch.client.transfer;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -14,6 +15,7 @@ import java.util.List;
  * Describes all files to be transferred in a single session.
  * Sent by sender to receiver as the first control message.
  */
+@JsonIgnoreProperties(ignoreUnknown = true)
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class FileManifest {
 

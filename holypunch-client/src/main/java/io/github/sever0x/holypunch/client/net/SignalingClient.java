@@ -20,6 +20,7 @@ import java.util.concurrent.TimeUnit;
  *   - after RELAY_READY: hand off the connection to RelayTransport
  *
  * Uses java.net.http.WebSocket (GraalVM native-image compatible, no external deps).
+ * HttpClient is kept as a field — closing it would block until WebSocket is closed.
  */
 public class SignalingClient {
 
@@ -27,6 +28,7 @@ public class SignalingClient {
     private static final long CONNECT_TIMEOUT_SECONDS = 10;
 
     private final String serverUrl;
+    private final HttpClient httpClient = HttpClient.newHttpClient();
     private WebSocket webSocket;
     private volatile boolean open = false;
 
@@ -39,8 +41,7 @@ public class SignalingClient {
 
     public void connect() throws IOException, InterruptedException {
         try {
-            HttpClient client = HttpClient.newHttpClient();
-            webSocket = client
+            webSocket = httpClient
                     .newWebSocketBuilder()
                     .buildAsync(URI.create(serverUrl), new Listener())
                     .get(CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
