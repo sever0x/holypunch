@@ -50,20 +50,29 @@ public class SignalingWebSocketHandler implements WebSocketHandler {
     }
 
     private void processMessage(ClientSession client, WebSocketMessage msg, String remoteIp) throws Exception {
-        if (msg.getType() == WebSocketMessage.Type.BINARY) {
-            handleBinaryRelay(client, msg);
+        // Once relay is active forward everything (text and binary) without parsing
+        if (client.pair != null && client.pair.relayMode.get()) {
+            if (msg.getType() == WebSocketMessage.Type.BINARY) {
+                handleBinaryRelay(client, msg);
+            } else {
+                handleForwardTopeer(client, msg.getPayloadAsText());
+            }
             return;
+        }
+
+        if (msg.getType() == WebSocketMessage.Type.BINARY) {
+            return; // binary before relay mode — ignore
         }
 
         JsonNode root = mapper.readTree(msg.getPayloadAsText());
         String type = root.path("type").asText();
 
         switch (type) {
-            case "JOIN_SENDER" -> handleJoinSender(client);
-            case "JOIN_RECEIVER" -> handleJoinReceiver(client, root, remoteIp);
+            case "JOIN_SENDER"    -> handleJoinSender(client);
+            case "JOIN_RECEIVER"  -> handleJoinReceiver(client, root, remoteIp);
             case "ICE_CANDIDATES" -> handleForwardTopeer(client, msg.getPayloadAsText());
-            case "RELAY_REQUEST" -> handleRelayRequest(client);
-            default -> log.warn("Unknown message type '{}' from {}", type, client.ws.getId());
+            case "RELAY_REQUEST"  -> handleRelayRequest(client);
+            default -> log.warn("Unknown signaling type '{}' from {}", type, client.ws.getId());
         }
     }
 
