@@ -26,6 +26,14 @@ public interface Transport {
      */
     Message receive() throws IOException, InterruptedException;
 
+    /**
+     * Waits up to {@code timeoutMs} for the next message.
+     * Returns null on timeout or clean close.
+     */
+    default Message receiveWithTimeout(long timeoutMs) throws IOException, InterruptedException {
+        return receive(); // default: no timeout; override in concrete classes
+    }
+
     boolean isOpen();
 
     void close();

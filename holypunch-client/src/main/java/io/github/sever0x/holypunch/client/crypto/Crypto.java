@@ -102,15 +102,23 @@ public class Crypto {
                 Base64.getEncoder().encodeToString(masked));
     }
 
+    private static final long KEY_EXCHANGE_TIMEOUT_MS = 30_000;
+
     private byte[] readPeerKey(Transport transport) throws Exception {
+        long deadline = System.currentTimeMillis() + KEY_EXCHANGE_TIMEOUT_MS;
         while (true) {
-            Transport.Message msg = transport.receive();
-            if (msg == null) throw new java.io.IOException("Transport closed during key exchange");
-            if (msg.binary()) continue; // unexpected binary before encryption — skip
+            long remaining = deadline - System.currentTimeMillis();
+            if (remaining <= 0) {
+                throw new java.io.IOException(
+                        "Key exchange timeout — P2P data channel not responding after 30 s");
+            }
+            Transport.Message msg = transport.receiveWithTimeout(Math.min(remaining, 1_000));
+            if (msg == null) continue; // poll timeout, re-check deadline
+            if (msg.binary()) continue;
             JsonNode node = mapper.readTree(msg.text());
             if ("KEY_EXCHANGE".equals(node.path("type").asText())) {
                 byte[] masked = Base64.getDecoder().decode(node.path("pk").asText());
-                return xor(masked, w); // unmask → raw peer public key
+                return xor(masked, w);
             }
         }
     }

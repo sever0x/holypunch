@@ -39,11 +39,18 @@ public class DirectTransport implements Transport {
 
     @Override
     public Message receive() throws IOException, InterruptedException {
-        byte[] raw = arq.receive();
+        return parse(arq.receive());
+    }
+
+    @Override
+    public Message receiveWithTimeout(long timeoutMs) throws IOException, InterruptedException {
+        return parse(arq.receiveWithTimeout(timeoutMs));
+    }
+
+    private Message parse(byte[] raw) {
         if (raw == null || raw.length < 1) return null;
-        byte mark    = raw[0];
         byte[] payload = Arrays.copyOfRange(raw, 1, raw.length);
-        return mark == MARK_TEXT
+        return raw[0] == MARK_TEXT
                 ? Message.ofText(new String(payload, StandardCharsets.UTF_8))
                 : Message.ofBinary(payload);
     }

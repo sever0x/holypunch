@@ -55,13 +55,17 @@ public class SignalingWebSocketHandler implements WebSocketHandler {
             if (msg.getType() == WebSocketMessage.Type.BINARY) {
                 handleBinaryRelay(client, msg);
             } else {
-                handleForwardTopeer(client, msg.getPayloadAsText());
+                String text = msg.getPayloadAsText();
+                log.debug("[relay] {} → peer: {} bytes text (code={})",
+                        client.ws.getId(), text.length(), client.pair.code);
+                handleForwardTopeer(client, text);
             }
             return;
         }
 
         if (msg.getType() == WebSocketMessage.Type.BINARY) {
-            return; // binary before relay mode — ignore
+            log.warn("Binary frame before relay mode from {} — ignoring", client.ws.getId());
+            return;
         }
 
         JsonNode root = mapper.readTree(msg.getPayloadAsText());
@@ -70,7 +74,11 @@ public class SignalingWebSocketHandler implements WebSocketHandler {
         switch (type) {
             case "JOIN_SENDER"    -> handleJoinSender(client);
             case "JOIN_RECEIVER"  -> handleJoinReceiver(client, root, remoteIp);
-            case "ICE_CANDIDATES" -> handleForwardTopeer(client, msg.getPayloadAsText());
+            case "ICE_CANDIDATES" -> {
+                log.info("[{}] ICE_CANDIDATES forwarded to peer (code={})",
+                        client.ws.getId(), client.pair != null ? client.pair.code : "?");
+                handleForwardTopeer(client, msg.getPayloadAsText());
+            }
             case "RELAY_REQUEST"  -> handleRelayRequest(client);
             default -> log.warn("Unknown signaling type '{}' from {}", type, client.ws.getId());
         }
@@ -127,25 +135,35 @@ public class SignalingWebSocketHandler implements WebSocketHandler {
         SessionPair pair = client.pair;
         if (pair == null || !pair.relayMode.get()) return;
         ClientSession peer = pair.peerOf(client);
-        if (peer == null) return;
-
-        // Copy payload to avoid Netty buffer release before the peer can send it
+        if (peer == null) {
+            log.warn("[{}] Binary relay: peer not connected (code={})", client.ws.getId(), pair.code);
+            return;
+        }
         byte[] bytes = new byte[msg.getPayload().readableByteCount()];
         msg.getPayload().read(bytes);
+        log.debug("[relay] {} → peer: {} bytes binary (code={})",
+                client.ws.getId(), bytes.length, pair.code);
         peer.send(peer.ws.binaryMessage(factory -> factory.wrap(bytes)));
     }
 
     private void onDisconnect(ClientSession client) {
         SessionPair pair = client.pair;
-        if (pair == null) return;
+        if (pair == null) {
+            log.info("[{}] Disconnected (no session)", client.ws.getId());
+            return;
+        }
+
+        String role = client.role != null ? client.role.name().toLowerCase() : "unknown";
+        boolean inRelay = pair.relayMode.get();
+        log.info("[{}] {} disconnected, code={}, relay={}", client.ws.getId(), role, pair.code, inRelay);
 
         registry.remove(pair.code);
         ClientSession peer = pair.peerOf(client);
         if (peer != null) {
             peer.sendText("{\"type\":\"PEER_DISCONNECTED\"}");
             peer.complete();
+            log.info("Notified peer of disconnection (code={})", pair.code);
         }
-        log.info("[{}] Disconnected, code={}", client.ws.getId(), pair.code);
     }
 
     private String remoteIp(WebSocketSession ws) {

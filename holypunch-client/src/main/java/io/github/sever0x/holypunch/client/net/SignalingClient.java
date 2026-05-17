@@ -27,10 +27,14 @@ public class SignalingClient {
     private static final int QUEUE_CAPACITY = 4096;
     private static final long CONNECT_TIMEOUT_SECONDS = 10;
 
+    /** Send a WebSocket ping every 20 s to prevent reverse-proxy idle timeout (Railway = ~60 s). */
+    private static final long KEEPALIVE_INTERVAL_MS = 20_000;
+
     private final String serverUrl;
     private final HttpClient httpClient = HttpClient.newHttpClient();
     private WebSocket webSocket;
     private volatile boolean open = false;
+    private Thread keepAliveThread;
 
     /** Shared queue: populated by the WebSocket listener, drained by receive() / RelayTransport. */
     final BlockingDeque<Transport.Message> queue = new LinkedBlockingDeque<>(QUEUE_CAPACITY);
@@ -46,8 +50,20 @@ public class SignalingClient {
                     .buildAsync(URI.create(serverUrl), new Listener())
                     .get(CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
             open = true;
+            keepAliveThread = Thread.ofVirtual().name("ws-keepalive").start(this::keepAliveLoop);
         } catch (Exception e) {
             throw new IOException("Failed to connect to " + serverUrl, e);
+        }
+    }
+
+    private void keepAliveLoop() {
+        while (open) {
+            try {
+                Thread.sleep(KEEPALIVE_INTERVAL_MS);
+                if (open) webSocket.sendPing(java.nio.ByteBuffer.allocate(0));
+            } catch (InterruptedException e) {
+                break;
+            } catch (Exception ignored) {}
         }
     }
 
@@ -89,6 +105,7 @@ public class SignalingClient {
     public void close() {
         if (open) {
             open = false;
+            if (keepAliveThread != null) keepAliveThread.interrupt();
             webSocket.sendClose(WebSocket.NORMAL_CLOSURE, "");
         }
     }

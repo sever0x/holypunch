@@ -134,10 +134,28 @@ public class ReceiveCommand implements Runnable {
         }
         System.out.println(" connected (" + mode + ")");
 
-        // ── 7. End-to-end key exchange ────────────────────────────────────────
+        // ── 7. End-to-end key exchange (with P2P→relay fallback) ─────────────
+        System.out.print("Key exchange...");
         Crypto crypto = new Crypto(code, mapper);
-        crypto.responderExchange(transport);
+        try {
+            crypto.responderExchange(transport);
+        } catch (IOException e) {
+            if (transport instanceof DirectTransport) {
+                System.out.println("\n  Direct path failed (" + e.getMessage() + ")");
+                System.out.print("Falling back to relay...");
+                transport.close();
+                iceAgent.close();
+                transport = requestRelay(signaling);
+                mode = "relay";
+                crypto = new Crypto(code, mapper);
+                crypto.responderExchange(transport);
+                System.out.println(" relay connected");
+            } else {
+                throw e;
+            }
+        }
         transport = crypto.wrapAsResponder(transport);
+        System.out.println(" done (" + mode + ")");
 
         // ── 8. Receive files ──────────────────────────────────────────────────
         ProgressDisplay progress = new ProgressDisplay(0, mode);

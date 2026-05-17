@@ -163,10 +163,28 @@ public class SendCommand implements Runnable {
         }
         System.out.println(" connected (" + mode + ")");
 
-        // ── 9. End-to-end key exchange ────────────────────────────────────────
+        // ── 9. End-to-end key exchange (with P2P→relay fallback) ─────────────
+        System.out.print("Key exchange...");
         Crypto crypto = new Crypto(code, mapper);
-        crypto.initiatorExchange(transport);
+        try {
+            crypto.initiatorExchange(transport);
+        } catch (IOException e) {
+            if (transport instanceof DirectTransport) {
+                System.out.println("\n  Direct path failed (" + e.getMessage() + ")");
+                System.out.print("Falling back to relay...");
+                transport.close();
+                iceAgent.close();
+                transport = requestRelay(signaling);
+                mode = "relay";
+                crypto = new Crypto(code, mapper);
+                crypto.initiatorExchange(transport);
+                System.out.println(" relay connected");
+            } else {
+                throw e;
+            }
+        }
         transport = crypto.wrapAsInitiator(transport);
+        System.out.println(" done (" + mode + ")");
 
         // ── 10. Stream ───────────────────────────────────────────────────────
         ProgressDisplay progress = new ProgressDisplay(manifest.totalBytes, mode);

@@ -46,14 +46,17 @@ public class RelayTransport implements Transport {
         }
     }
 
-    /**
-     * Blocks until the next message arrives from the peer (via server relay).
-     * Returns null on clean close (PEER_DISCONNECTED sentinel injected by SignalingClient).
-     */
     @Override
     public Message receive() throws IOException, InterruptedException {
-        Message msg = queue.take();
-        // Sentinel: server or SignalingClient signals peer has gone
+        return receiveWithTimeout(0); // 0 = block indefinitely via queue.take()
+    }
+
+    @Override
+    public Message receiveWithTimeout(long timeoutMs) throws IOException, InterruptedException {
+        Message msg = timeoutMs <= 0
+                ? queue.take()
+                : queue.poll(timeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS);
+        if (msg == null) return null; // poll timeout
         if (!msg.binary() && "{\"type\":\"PEER_DISCONNECTED\"}".equals(msg.text())) {
             open = false;
             return null;

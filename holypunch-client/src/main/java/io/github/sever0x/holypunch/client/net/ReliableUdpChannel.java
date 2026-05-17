@@ -49,7 +49,8 @@ public class ReliableUdpChannel implements Closeable {
     static final int MTU         = 1280;  // payload bytes per datagram (safe internet MTU)
     static final int DATA_HEADER = 17;    // 1 + 4*4
     static final int WINDOW_SIZE = 2048;
-    private static final long RTO_MS  = 250;
+    private static final long RTO_MS       = 250;
+    private static final long SEND_TIMEOUT = 30_000; // throw if no ACK for 30 s
 
     private final DatagramChannel channel;
     private final AtomicBoolean   closed = new AtomicBoolean(false);
@@ -101,8 +102,13 @@ public class ReliableUdpChannel implements Closeable {
             lastSeq = seq;
         }
 
-        // Wait until all fragments of this message are ACKed
+        // Wait until all fragments ACKed, with timeout to detect broken P2P paths
+        long deadline = System.currentTimeMillis() + SEND_TIMEOUT;
         while (!closed.get() && unAcked.containsKey(lastSeq)) {
+            if (System.currentTimeMillis() > deadline) {
+                close();
+                throw new IOException("P2P channel unresponsive — no ACK received in 30 s");
+            }
             Thread.sleep(5);
         }
         if (closed.get()) throw new IOException("Channel closed while sending");
@@ -111,6 +117,11 @@ public class ReliableUdpChannel implements Closeable {
     /** Blocks until the next complete message is available. */
     public byte[] receive() throws InterruptedException {
         return deliveryQueue.take();
+    }
+
+    /** Waits up to {@code timeoutMs} ms; returns null on timeout. */
+    public byte[] receiveWithTimeout(long timeoutMs) throws InterruptedException {
+        return deliveryQueue.poll(timeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS);
     }
 
     @Override
