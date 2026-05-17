@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.sever0x.holypunch.client.ice.ConnectionEstablisher;
 import io.github.sever0x.holypunch.client.ice.IceAgent;
 import io.github.sever0x.holypunch.client.ice.IceCandidate;
+import io.github.sever0x.holypunch.client.crypto.Crypto;
 import io.github.sever0x.holypunch.client.net.DirectTransport;
 import io.github.sever0x.holypunch.client.net.SignalingClient;
 import io.github.sever0x.holypunch.client.net.Transport;
@@ -133,7 +134,12 @@ public class ReceiveCommand implements Runnable {
         }
         System.out.println(" connected (" + mode + ")");
 
-        // ── 7. Receive files ──────────────────────────────────────────────────
+        // ── 7. End-to-end key exchange ────────────────────────────────────────
+        Crypto crypto = new Crypto(code, mapper);
+        crypto.responderExchange(transport);
+        transport = crypto.wrapAsResponder(transport);
+
+        // ── 8. Receive files ──────────────────────────────────────────────────
         ProgressDisplay progress = new ProgressDisplay(0, mode);
         ChunkReceiver receiver = new ChunkReceiver(transport, destination, mapper);
         receiver.setProgressCallback(progress::update);

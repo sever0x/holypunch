@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.sever0x.holypunch.client.ice.ConnectionEstablisher;
 import io.github.sever0x.holypunch.client.ice.IceAgent;
 import io.github.sever0x.holypunch.client.ice.IceCandidate;
+import io.github.sever0x.holypunch.client.crypto.Crypto;
 import io.github.sever0x.holypunch.client.net.DirectTransport;
 import io.github.sever0x.holypunch.client.net.SignalingClient;
 import io.github.sever0x.holypunch.client.net.Transport;
@@ -160,7 +161,12 @@ public class SendCommand implements Runnable {
         }
         System.out.println(" connected (" + mode + ")");
 
-        // ── 9. Stream ────────────────────────────────────────────────────────
+        // ── 9. End-to-end key exchange ────────────────────────────────────────
+        Crypto crypto = new Crypto(code, mapper);
+        crypto.initiatorExchange(transport);
+        transport = crypto.wrapAsInitiator(transport);
+
+        // ── 10. Stream ───────────────────────────────────────────────────────
         ProgressDisplay progress = new ProgressDisplay(manifest.totalBytes, mode);
         ChunkStreamer streamer = new ChunkStreamer(transport, dir, manifest, mapper);
         streamer.setProgressCallback(progress::update);

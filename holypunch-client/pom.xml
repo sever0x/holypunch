@@ -88,6 +88,11 @@
                         <configuration>
                             <mainClass>io.github.sever0x.holypunch.client.HolypunchMain</mainClass>
                             <imageName>holypunch</imageName>
+                            <buildArgs>
+                                <buildArg>--no-fallback</buildArg>
+                                <buildArg>--enable-url-protocols=https</buildArg>
+                                <buildArg>-H:+ReportExceptionStackTraces</buildArg>
+                            </buildArgs>
                         </configuration>
                     </plugin>
                 </plugins>
