@@ -33,3 +33,6 @@ build/
 .vscode/
 /holypunch-plan.md
 *.local.*
+
+### Private docs ###
+docs/*.md
