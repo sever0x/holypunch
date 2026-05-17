@@ -18,7 +18,7 @@ import java.util.Arrays;
  * delivered as a binary message, regardless of the original type.
  *
  * Wire format of each encrypted message:
- *   [4 bytes: counter (big-endian)] [8 bytes: random nonce half]  ← 12-byte GCM IV
+ *   [8 bytes: counter (big-endian)] [4 bytes: random nonce half]  ← 12-byte GCM IV
  *   [ciphertext]                                                    ← AES-256-GCM output
  *   (GCM tag is appended to ciphertext by the Cipher, 16 bytes)
  *
@@ -40,7 +40,7 @@ public class EncryptedTransport implements Transport {
     private final SecretKeySpec sendKey;
     private final SecretKeySpec recvKey;
     private long sendCounter = 0;
-    private final byte[] nonceSuffix = new byte[8]; // random half of IV, fixed per session
+    private final byte[] nonceSuffix = new byte[4]; // random half of IV, fixed per session
 
     public EncryptedTransport(Transport inner, byte[] sendKeyBytes, byte[] recvKeyBytes) {
         this.inner   = inner;
@@ -125,14 +125,14 @@ public class EncryptedTransport implements Transport {
     }
 
     /**
-     * IV = [4-byte big-endian counter][8-byte fixed random nonce suffix].
+     * IV = [8-byte big-endian counter][4-byte fixed random nonce suffix].
      * Counter increments per message; nonce suffix is random per session.
-     * This guarantees IV uniqueness for up to 2^32 messages on the send key.
+     * This guarantees IV uniqueness for up to 2^63 messages on the send key.
      */
     private byte[] buildIv(long counter) {
         byte[] iv = new byte[IV_BYTES];
-        ByteBuffer.wrap(iv).putInt((int) counter);
-        System.arraycopy(nonceSuffix, 0, iv, 4, 8);
+        ByteBuffer.wrap(iv).putLong(counter);
+        System.arraycopy(nonceSuffix, 0, iv, 8, 4);
         return iv;
     }
 }

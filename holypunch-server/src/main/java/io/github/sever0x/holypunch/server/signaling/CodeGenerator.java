@@ -36,6 +36,8 @@ public class CodeGenerator {
         return words.get(random.nextInt(size)) + "-" +
                words.get(random.nextInt(size)) + "-" +
                words.get(random.nextInt(size)) + "-" +
+               words.get(random.nextInt(size)) + "-" +
+               words.get(random.nextInt(size)) + "-" +
                words.get(random.nextInt(size));
     }
 }

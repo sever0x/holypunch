@@ -121,13 +121,14 @@ public class SignalingWebSocketHandler implements WebSocketHandler {
         }
     }
 
-    private void handleRelayRequest(ClientSession client) throws Exception {
+    private void handleRelayRequest(ClientSession client) {
         SessionPair pair = client.pair;
-        if (pair == null || !pair.relayMode.compareAndSet(false, true)) return;
+        if (pair == null || pair.sender == null || pair.receiver == null) return;
+        if (!pair.relayMode.compareAndSet(false, true)) return;
 
         String msg = "{\"type\":\"RELAY_READY\"}";
-        if (pair.sender != null) pair.sender.sendText(msg);
-        if (pair.receiver != null) pair.receiver.sendText(msg);
+        pair.sender.sendText(msg);
+        pair.receiver.sendText(msg);
         log.info("Relay mode activated for code={}", pair.code);
     }
 

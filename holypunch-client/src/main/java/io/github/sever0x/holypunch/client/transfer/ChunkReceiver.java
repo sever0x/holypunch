@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.github.sever0x.holypunch.client.net.Transport;
 
-import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
@@ -62,6 +61,7 @@ public class ChunkReceiver {
         // 2. Read MANIFEST
         Transport.Message msg = receiveText();
         FileManifest manifest = mapper.readValue(msg.text(), FileManifest.class);
+        validateManifest(manifest);
 
         // If manifest changed since last session: discard previous resume state
         if (!manifest.hash.equals(state.manifestHash)) {
@@ -226,8 +226,29 @@ public class ChunkReceiver {
         return mapper.writeValueAsString(node);
     }
 
-    private Path resolveDestPath(String relativePath) {
-        return destDir.resolve(relativePath.replace('/', File.separatorChar));
+    private void validateManifest(FileManifest manifest) throws IOException {
+        if (manifest.files == null) throw new IOException("Manifest has no file list");
+        for (FileManifest.FileEntry entry : manifest.files) {
+            if (entry.path == null || entry.path.isEmpty())
+                throw new IOException("Manifest entry has null or empty path");
+            if (entry.path.startsWith("/") || entry.path.startsWith("\\"))
+                throw new IOException("Absolute path rejected in manifest: " + entry.path);
+            if (entry.path.contains("\0"))
+                throw new IOException("Null byte in manifest path: " + entry.path);
+            String normalized = entry.path.replace('\\', '/');
+            for (String segment : normalized.split("/", -1)) {
+                if ("..".equals(segment))
+                    throw new IOException("Path traversal rejected in manifest: " + entry.path);
+            }
+        }
+    }
+
+    private Path resolveDestPath(String relativePath) throws IOException {
+        Path base = destDir.toAbsolutePath().normalize();
+        Path resolved = base.resolve(relativePath).normalize();
+        if (!resolved.startsWith(base))
+            throw new IOException("Path traversal detected: " + relativePath);
+        return resolved;
     }
 
     /** Reads the next text frame, skipping unexpected binary frames. */
