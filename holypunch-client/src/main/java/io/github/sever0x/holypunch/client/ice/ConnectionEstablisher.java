@@ -62,8 +62,13 @@ public final class ConnectionEstablisher {
                     buf.flip();
                     if (!isProbe(buf)) continue;
 
-                    // Send response so the other side also confirms connectivity
-                    channel.send(ByteBuffer.wrap(PROBE_MAGIC), from);
+                    // Send response so the other side also confirms connectivity.
+                    // Catch AlreadyConnectedException: if the main thread called
+                    // channel.connect(winner) between our receive and this send,
+                    // send(buf, addr) is illegal on a connected channel.
+                    try {
+                        channel.send(ByteBuffer.wrap(PROBE_MAGIC), from);
+                    } catch (java.nio.channels.AlreadyConnectedException ignored) {}
 
                     if (winner.compareAndSet(null, from)) {
                         latch.countDown();
