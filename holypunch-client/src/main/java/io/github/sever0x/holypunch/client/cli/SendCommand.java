@@ -115,7 +115,15 @@ public class SendCommand implements Runnable {
         }
         System.out.printf("\rPeer joined!%-50s%n", "");
 
-        // ── 6. Finish hashing ────────────────────────────────────────────────
+        // ── 6. Send ICE candidates as soon as gathered (don't wait for hashing) ─
+        // Decoupling ICE exchange from hashing prevents receiver from timing out
+        // while sender is still computing SHA-256 hashes.
+        iceFuture.join();
+        if (!iceAgent.getLocalCandidates().isEmpty()) {
+            signaling.sendText(iceAgent.buildJson(mapper));
+        }
+
+        // ── 7. Finish hashing (parallel with ICE connectivity check below) ───
         while (!hashFuture.isDone()) {
             ProgressDisplay.printHashProgress(hashDone.get(), manifest.totalFiles);
             Thread.sleep(200);
@@ -125,12 +133,6 @@ public class SendCommand implements Runnable {
         System.out.printf("\rHashing complete: %d/%d files%n",
                 manifest.totalFiles, manifest.totalFiles);
         manifest.computeAndSetHash(mapper);
-
-        // ── 7. ICE candidate exchange ────────────────────────────────────────
-        iceFuture.join(); // ICE gathering must be done before sending candidates
-        if (!iceAgent.getLocalCandidates().isEmpty()) {
-            signaling.sendText(iceAgent.buildJson(mapper));
-        }
 
         // ── 8. Try P2P, fall back to relay ───────────────────────────────────
         Transport transport;
