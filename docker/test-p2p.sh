@@ -10,6 +10,18 @@
 set -e
 cd "$(dirname "$0")/.."
 
+# Build images only if they don't exist yet. Pass REBUILD=1 to force a rebuild.
+build_images() {
+  if [ "${REBUILD:-0}" = "1" ] || \
+     ! docker image inspect holypunch-server:local >/dev/null 2>&1 || \
+     ! docker image inspect holypunch-client:local >/dev/null 2>&1; then
+    echo "=== Building Docker images ==="
+    docker compose -f docker/compose.yml build
+  else
+    echo "=== Images already built (REBUILD=1 to force) ==="
+  fi
+}
+
 echo "=== Generating test data (60 MB total) ==="
 mkdir -p testdata output
 dd if=/dev/urandom of=testdata/small.bin  bs=1M count=5  2>/dev/null
@@ -17,8 +29,7 @@ dd if=/dev/urandom of=testdata/medium.bin bs=1M count=50 2>/dev/null
 mkdir -p testdata/sub
 dd if=/dev/urandom of=testdata/sub/nested.bin bs=1M count=5 2>/dev/null
 
-echo "=== Building Docker images ==="
-docker compose -f docker/compose.yml build
+build_images
 
 echo "=== Starting server and sender ==="
 docker compose -f docker/compose.yml up -d hp-server hp-sender

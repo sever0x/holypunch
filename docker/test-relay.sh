@@ -12,12 +12,22 @@
 set -e
 cd "$(dirname "$0")/.."
 
+build_images() {
+  if [ "${REBUILD:-0}" = "1" ] || \
+     ! docker image inspect holypunch-server:local >/dev/null 2>&1 || \
+     ! docker image inspect holypunch-client:local >/dev/null 2>&1; then
+    echo "=== Building Docker images ==="
+    docker compose -f docker/compose.yml build
+  else
+    echo "=== Images already built (REBUILD=1 to force) ==="
+  fi
+}
+
 echo "=== Generating test data ==="
 mkdir -p testdata output
 dd if=/dev/urandom of=testdata/relay-test.bin bs=1M count=20 2>/dev/null
 
-echo "=== Building images ==="
-docker compose -f docker/compose.yml -f docker/compose.relay.yml build
+build_images
 
 echo "=== Starting server + sender ==="
 docker compose -f docker/compose.yml -f docker/compose.relay.yml up -d hp-server hp-sender
@@ -44,10 +54,11 @@ echo "=== Code: $CODE ==="
 
 echo "=== Starting receiver (also UDP-blocked → relay on both sides) ==="
 MSYS_NO_PATHCONV=1 docker compose -f docker/compose.yml -f docker/compose.relay.yml run --rm \
+  --entrypoint sh \
   --cap-add NET_ADMIN \
   -e HOLYPUNCH_SERVER=ws://hp-server:8080/signal \
   -v "$(pwd -W)/output:/output" \
-  hp-sender sh -c "
+  hp-sender -c "
     apk add -q iptables 2>/dev/null
     iptables -A OUTPUT -p udp -j DROP
     java -jar app.jar receive $CODE /output
